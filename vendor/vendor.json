@@ -33,6 +33,18 @@
 			"revisionTime": "2017-03-04T07:09:54Z"
 		},
 		{
+			"checksumSHA1": "/I7++aEz63H9l6LqyGC2vuR2QNw=",
+			"path": "github.com/qnib/qframe-collector-tcp",
+			"revision": "3feaa2d2fa7e0a1d9b282de059a32dca3511be90",
+			"revisionTime": "2017-04-21T10:31:42Z"
+		},
+		{
+			"checksumSHA1": "sDjkWEEV1CsJMz2+DBst4584eU8=",
+			"path": "github.com/qnib/qframe-collector-tcp/lib",
+			"revision": "3feaa2d2fa7e0a1d9b282de059a32dca3511be90",
+			"revisionTime": "2017-04-21T10:31:42Z"
+		},
+		{
 			"checksumSHA1": "BgaylqF0DbYrUTsvwihIntSIPt0=",
 			"path": "github.com/qnib/qframe-types",
 			"revision": "ad7950fc1fc730444b7179880c04513bfede930d",
