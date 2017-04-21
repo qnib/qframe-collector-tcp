@@ -37,7 +37,7 @@ func main() {
 	bg := qChan.Data.Join()
 	for {
 		qm := bg.Recv().(qtypes.QMsg)
-		fmt.Printf("#### Received: %s\n", qm.Msg)
+		fmt.Printf("#### Received (remote:%s): %s\n", qm.Host, qm.Msg)
 		break
 
 	}
