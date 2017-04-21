@@ -21,5 +21,4 @@ $ echo "Test-$(date +%s)" | nc -w1  localhost 11001
 ... the message will be displayed and the script exits:
 
 ```
-#### Received: Test-1492771065
-```
+#### Received (remote:127.0.0.1:60846): Test-1492771635```
