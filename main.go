@@ -20,8 +20,8 @@ func main() {
 	qChan := qtypes.NewQChan()
 	qChan.Broadcast()
 	cfgMap := map[string]string{
-		"collector.test.port": "10001",
-		"collector.test.docker-host": "unix:///var/run/docker.sock",
+		"collector.tcp.port": "10001",
+		"collector.tcp.docker-host": "unix:///var/run/docker.sock",
 	}
 
 	cfg := config.NewConfig(
@@ -29,14 +29,14 @@ func main() {
 			config.NewStatic(cfgMap),
 		},
 	)
-	pde, err := qframe_collector_docker_events.New(qChan, *cfg, "test")
+	pde, err := qframe_collector_docker_events.New(qChan, *cfg, "docker-events")
 	if err != nil {
 		log.Printf("[EE] Failed to create collector: %v", err)
 		return
 	}
 	go pde.Run()
 	time.Sleep(2*time.Second)
-	p, err := qframe_collector_tcp.New(qChan, *cfg, "test")
+	p, err := qframe_collector_tcp.New(qChan, *cfg, "tcp")
 	if err != nil {
 		log.Printf("[EE] Failed to create collector: %v", err)
 		return
@@ -46,8 +46,9 @@ func main() {
 	bg := qChan.Data.Join()
 	for {
 		qm := bg.Recv().(qtypes.QMsg)
-		fmt.Printf("#### Received (remote:%s): %s\n", qm.Host, qm.Msg)
-		//break
-
+		if qm.Source == "tcp" {
+			fmt.Printf("#### Received '%s' from enriched container: %v\n", qm.Msg, qm.Data)
+			break
+		}
 	}
 }

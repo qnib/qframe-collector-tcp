@@ -8,6 +8,7 @@ import (
 	"github.com/zpatrick/go-config"
 	"github.com/qnib/qframe-types"
 	"github.com/docker/docker/client"
+	"strings"
 )
 
 const (
@@ -36,6 +37,9 @@ func (p *Plugin) Run() {
 	port := p.CfgStringOr("bind-port", "11001")
 	dockerHost, err := p.CfgString("docker-host")
 	if err != nil {
+		p.Log("error", "Failed to fetch 'docker-host'")
+		p.Inventory = qtypes.NewPlainContainerInventory()
+	} else {
 		engineCli, _ := client.NewClient(dockerHost, dockerAPI, nil, nil)
 		p.Inventory = qtypes.NewContainerInventory(engineCli)
 	}
@@ -57,8 +61,13 @@ func (p *Plugin) Run() {
 			case IncommingMsg:
 				im := msg.(IncommingMsg)
 				qm := qtypes.NewQMsg("tcp", p.Name)
-				qm.Host = im.Host
 				qm.Msg = im.Msg
+				cnt, err := p.Inventory.GetCntByIP(im.Host)
+				if err != nil {
+					p.Log("error", err.Error())
+				}
+				qm.Host = strings.Trim(cnt.Name, "/")
+				qm.Data = cnt
 				p.QChan.Data.Send(qm)
 			}
 		case dcMsg := <-dc.Read:
@@ -68,11 +77,7 @@ func (p *Plugin) Run() {
 				switch cm.Data.(type) {
 				case qtypes.ContainerEvent:
 					ce := cm.Data.(qtypes.ContainerEvent)
-					if ce.Event.Type == "container" && ce.Event.Action == "start" {
-						p.Log("info", fmt.Sprintf("Update inventory: %v", ce.Event))
-						cnt, _ := p.Inventory.GetCntByEvent(ce.Event)
-						p.Log("info", fmt.Sprintf("Found container: %s", cnt.Name))
-					}
+					p.Inventory.SetCntByEvent(ce.Event)
 				}
 			}
 		}
@@ -107,9 +112,10 @@ func (p *Plugin) handleRequest(conn net.Conn) {
 		fmt.Println("Error reading:", err.Error())
 	} else {
 		n := bytes.Index(buf, []byte{0})
+		addrTuple := strings.Split(conn.RemoteAddr().String(), ":")
 		im := IncommingMsg{
 			Msg: string(buf[:n-1]),
-			Host: conn.RemoteAddr().String(),
+			Host: addrTuple[0],
 		}
 		p.buffer <- im
 	}
