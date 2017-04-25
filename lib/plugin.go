@@ -62,6 +62,7 @@ func (p *Plugin) Run() {
 				im := msg.(IncommingMsg)
 				qm := qtypes.NewQMsg("tcp", p.Name)
 				qm.Msg = im.Msg
+				// TODO: Move this to the docker-events plugin, so that this plugin does not need to connect to the docker-engine
 				cnt, err := p.Inventory.GetCntByIP(im.Host)
 				if err != nil {
 					p.Log("error", err.Error())
