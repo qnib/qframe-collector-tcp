@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
 	"net"
+
 	"github.com/zpatrick/go-config"
 	"github.com/qnib/qframe-types"
-	"github.com/docker/docker/client"
-	"strings"
 )
 
 const (
@@ -35,14 +35,7 @@ func New(qChan qtypes.QChan, cfg config.Config, name string) (Plugin, error) {
 func (p *Plugin) Run() {
 	host := p.CfgStringOr("bind-host", "0.0.0.0")
 	port := p.CfgStringOr("bind-port", "11001")
-	dockerHost, err := p.CfgString("docker-host")
-	if err != nil {
-		p.Log("error", "Failed to fetch 'docker-host'")
-		p.Inventory = qtypes.NewPlainContainerInventory()
-	} else {
-		engineCli, _ := client.NewClient(dockerHost, dockerAPI, nil, nil)
-		p.Inventory = qtypes.NewContainerInventory(engineCli)
-	}
+	p.Inventory = qtypes.NewContainerInventory()
 	// Listen for incoming connections.
 	l, err := net.Listen("tcp", host+":"+port)
 	if err != nil {
@@ -62,7 +55,6 @@ func (p *Plugin) Run() {
 				im := msg.(IncommingMsg)
 				qm := qtypes.NewQMsg("tcp", p.Name)
 				qm.Msg = im.Msg
-				// TODO: Move this to the docker-events plugin, so that this plugin does not need to connect to the docker-engine
 				cnt, err := p.Inventory.GetCntByIP(im.Host)
 				if err != nil {
 					p.Log("error", err.Error())
@@ -78,7 +70,7 @@ func (p *Plugin) Run() {
 				switch cm.Data.(type) {
 				case qtypes.ContainerEvent:
 					ce := cm.Data.(qtypes.ContainerEvent)
-					p.Inventory.SetCntByEvent(ce.Event)
+					p.Inventory.SetCntByEvent(ce)
 				}
 			}
 		}
