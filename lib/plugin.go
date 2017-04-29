@@ -6,7 +6,8 @@ import (
 	"os"
 	"strings"
 	"net"
-
+	"time"
+	
 	"github.com/zpatrick/go-config"
 	"github.com/qnib/qframe-types"
 )
@@ -14,7 +15,6 @@ import (
 const (
 	version = "0.1.2"
 	pluginTyp = "collector"
-	dockerAPI = "v1.29"
 )
 
 type Plugin struct {
@@ -47,6 +47,7 @@ func (p *Plugin) Run() {
 	p.Log("info", fmt.Sprintln("Listening on " + host + ":" + port))
 	go p.handleRequests(l)
 	dc := p.QChan.Data.Join()
+	//containers := map[string]types.ContainerJSON{}
 	for {
 		select {
 		case msg := <- p.buffer:
@@ -55,13 +56,17 @@ func (p *Plugin) Run() {
 				im := msg.(IncommingMsg)
 				qm := qtypes.NewQMsg("tcp", p.Name)
 				qm.Msg = im.Msg
-				cnt, err := p.Inventory.GetCntByIP(im.Host)
-				if err != nil {
-					p.Log("error", err.Error())
-				}
-				qm.Host = strings.Trim(cnt.Name, "/")
-				qm.Data = cnt
+				qm.Time = im.Time
+				qm.Host = im.Host
+				p.Log("debug", fmt.Sprintf("%s: %s", im.Host, qm.Msg))
+				/*if cnt, ok := containers[im.Host]; ok {
+					qm.Host = strings.Trim(cnt.Name, "/")
+					qm.Data = cnt
+					p.QChan.Data.Send(qm)
+					continue
+				}*/
 				p.QChan.Data.Send(qm)
+
 			}
 		case dcMsg := <-dc.Read:
 			switch dcMsg.(type) {
@@ -70,7 +75,11 @@ func (p *Plugin) Run() {
 				switch cm.Data.(type) {
 				case qtypes.ContainerEvent:
 					ce := cm.Data.(qtypes.ContainerEvent)
-					p.Inventory.SetCntByEvent(ce)
+					p.Log("debug", fmt.Sprintf("%s.%s", ce.Event.Type, ce.Event.Action))
+					/*for _, v := range ce.Container.NetworkSettings.Networks {
+						containers[v.IPAddress] = ce.Container
+					}*/
+
 				}
 			}
 		}
@@ -93,6 +102,7 @@ func (p *Plugin) handleRequests(l net.Listener) {
 
 type IncommingMsg struct {
 	Msg string
+	Time time.Time
 	Host string
 }
 
@@ -108,6 +118,7 @@ func (p *Plugin) handleRequest(conn net.Conn) {
 		addrTuple := strings.Split(conn.RemoteAddr().String(), ":")
 		im := IncommingMsg{
 			Msg: string(buf[:n-1]),
+			Time: time.Now(),
 			Host: addrTuple[0],
 		}
 		p.buffer <- im
