@@ -9,6 +9,7 @@ import (
 
 	"github.com/zpatrick/go-config"
 	"github.com/qnib/qframe-types"
+	"github.com/qnib/qframe-inventory/lib"
 )
 
 const (
@@ -20,7 +21,6 @@ const (
 type Plugin struct {
 	qtypes.Plugin
 	buffer chan interface{}
-	Inventory qtypes.ContainerInventory
 }
 
 func New(qChan qtypes.QChan, cfg config.Config, name string) (Plugin, error) {
@@ -35,7 +35,6 @@ func New(qChan qtypes.QChan, cfg config.Config, name string) (Plugin, error) {
 func (p *Plugin) Run() {
 	host := p.CfgStringOr("bind-host", "0.0.0.0")
 	port := p.CfgStringOr("bind-port", "11001")
-	p.Inventory = qtypes.NewContainerInventory()
 	// Listen for incoming connections.
 	l, err := net.Listen("tcp", host+":"+port)
 	if err != nil {
@@ -46,7 +45,6 @@ func (p *Plugin) Run() {
 	defer l.Close()
 	p.Log("info", fmt.Sprintln("Listening on " + host + ":" + port))
 	go p.handleRequests(l)
-	dc := p.QChan.Data.Join()
 	for {
 		select {
 		case msg := <- p.buffer:
@@ -55,23 +53,12 @@ func (p *Plugin) Run() {
 				im := msg.(IncommingMsg)
 				qm := qtypes.NewQMsg("tcp", p.Name)
 				qm.Msg = im.Msg
-				cnt, err := p.Inventory.GetCntByIP(im.Host)
-				if err != nil {
-					p.Log("error", err.Error())
-				}
+				req := qframe_inventory.NewIPContainerRequest(im.Host)
+				p.QChan.Data.Send(req)
+				cnt := <- req.Back
 				qm.Host = strings.Trim(cnt.Name, "/")
 				qm.Data = cnt
 				p.QChan.Data.Send(qm)
-			}
-		case dcMsg := <-dc.Read:
-			switch dcMsg.(type) {
-			case qtypes.QMsg:
-				cm := dcMsg.(qtypes.QMsg)
-				switch cm.Data.(type) {
-				case qtypes.ContainerEvent:
-					ce := cm.Data.(qtypes.ContainerEvent)
-					p.Inventory.SetCntByEvent(ce)
-				}
 			}
 		}
 	}
@@ -110,6 +97,7 @@ func (p *Plugin) handleRequest(conn net.Conn) {
 			Msg: string(buf[:n-1]),
 			Host: addrTuple[0],
 		}
+		p.Log("info", fmt.Sprintf("Received TCP message '%s' from '%s'", im.Msg, im.Host))
 		p.buffer <- im
 	}
 	// Close the connection when you're done with it.

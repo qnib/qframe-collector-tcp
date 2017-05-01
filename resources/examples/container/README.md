@@ -21,3 +21,5 @@ The message was sent like this...
 $ docker run -ti -v $(pwd)/resources/examples/container/:/data/ \
          debian:latest /data/send-metric.sh $(docker inspect -f '{{ .NetworkSettings.Networks.bridge.IPAddress }}' qframe-collector-tcp)
 ```
+
+
