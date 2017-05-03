@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"net"
+	"reflect"
 
 	"github.com/zpatrick/go-config"
 	"github.com/qnib/qframe-types"
@@ -53,12 +54,15 @@ func (p *Plugin) Run() {
 				im := msg.(IncommingMsg)
 				qm := qtypes.NewQMsg("tcp", p.Name)
 				qm.Msg = im.Msg
+				p.Log("info", fmt.Sprintf("Got msg from buffer: %s", qm.Msg))
 				req := qframe_inventory.NewIPContainerRequest(im.Host)
 				p.QChan.Data.Send(req)
 				cnt := <- req.Back
 				qm.Host = strings.Trim(cnt.Name, "/")
 				qm.Data = cnt
 				p.QChan.Data.Send(qm)
+			default:
+				p.Log("info", fmt.Sprintf("Unkown data type: %s", reflect.TypeOf(msg)))
 			}
 		}
 	}
