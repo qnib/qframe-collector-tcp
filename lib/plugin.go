@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 	"net"
 	"reflect"
 
@@ -33,6 +34,27 @@ func New(qChan qtypes.QChan, cfg config.Config, name string) (Plugin, error) {
 	return p, err
 }
 
+func (p *Plugin) HandleInventoryRequest(qm qtypes.Message) {
+	if _, ok := qm.KV["host"]; !ok {
+		p.Log("error", fmt.Sprintf("Got msg '%s' without host key!", qm))
+		qm.SourceSuccess = false
+		p.QChan.Data.Send(qm)
+		return
+	}
+	p.Log("info", fmt.Sprintf("Got msg from %s: %s", qm.KV["host"], qm.Message))
+	req := qframe_inventory.NewIPContainerRequest(strings.Join(qm.SourcePath,","), qm.KV["host"])
+	p.QChan.Data.Send(req)
+	resp := <- req.Back
+	if resp.Error != nil {
+		p.Log("error", resp.Error.Error())
+		qm.SourceSuccess = false
+	} else {
+		qm.Container = resp.Container
+		p.Log("info", fmt.Sprintf("Got InventoryResponse: ContainerName:%s | Image:%s", qm.GetContainerName(), qm.Container.Config.Image))
+	}
+	p.QChan.Data.Send(qm)
+}
+
 func (p *Plugin) Run() {
 	host := p.CfgStringOr("bind-host", "0.0.0.0")
 	port := p.CfgStringOr("bind-port", "11001")
@@ -52,17 +74,12 @@ func (p *Plugin) Run() {
 			switch msg.(type) {
 			case IncommingMsg:
 				im := msg.(IncommingMsg)
-				qm := qtypes.NewQMsg("tcp", p.Name)
-				qm.Msg = im.Msg
-				p.Log("info", fmt.Sprintf("Got msg from buffer: %s", qm.Msg))
-				req := qframe_inventory.NewIPContainerRequest(im.Host)
-				p.QChan.Data.Send(req)
-				cnt := <- req.Back
-				qm.Host = strings.Trim(cnt.Name, "/")
-				qm.Data = cnt
-				p.QChan.Data.Send(qm)
+				base := qtypes.NewTimedBase("tcp", time.Now())
+				qm := qtypes.NewMessage(base, p.Name, qtypes.MsgTCP, im.Msg)
+				qm.KV["host"] = im.Host
+				go p.HandleInventoryRequest(qm)
 			default:
-				p.Log("info", fmt.Sprintf("Unkown data type: %s", reflect.TypeOf(msg)))
+				p.Log("warn", fmt.Sprintf("Unkown data type: %s", reflect.TypeOf(msg)))
 			}
 		}
 	}
@@ -101,7 +118,7 @@ func (p *Plugin) handleRequest(conn net.Conn) {
 			Msg: string(buf[:n-1]),
 			Host: addrTuple[0],
 		}
-		p.Log("info", fmt.Sprintf("Received TCP message '%s' from '%s'", im.Msg, im.Host))
+		p.Log("debug", fmt.Sprintf("Received Raw TCP message '%s' from '%s'", im.Msg, im.Host))
 		p.buffer <- im
 	}
 	// Close the connection when you're done with it.
