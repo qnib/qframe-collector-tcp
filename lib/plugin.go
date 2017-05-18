@@ -42,21 +42,28 @@ func (p *Plugin) HandleInventoryRequest(qm qtypes.Message) {
 		p.QChan.Data.Send(qm)
 		return
 	}
-	p.Log("info", fmt.Sprintf("Got msg from %s: %s", qm.KV["host"], qm.Message))
+	p.Log("trace", fmt.Sprintf("Got msg from %s: %s", qm.KV["host"], qm.Message))
 	req := qframe_inventory.NewIPContainerRequest(strings.Join(qm.SourcePath,","), qm.KV["host"])
+	tout := p.CfgIntOr("inventory-timeout-ms", 2000)
+	timeout := time.NewTimer(time.Duration(tout)*time.Millisecond).C
 	p.QChan.Data.Send(req)
-	resp := <- req.Back
-	if resp.Error != nil {
-		p.Log("error", resp.Error.Error())
-		qm.SourceSuccess = false
-	} else {
-		qm.Container = resp.Container
-		p.Log("info", fmt.Sprintf("Got InventoryResponse: ContainerName:%s | Image:%s", qm.GetContainerName(), qm.Container.Config.Image))
+	select {
+	case resp := <- req.Back:
+		if resp.Error != nil {
+			p.Log("error", resp.Error.Error())
+			qm.SourceSuccess = false
+		} else {
+			qm.Container = resp.Container
+			p.Log("trace", fmt.Sprintf("Got InventoryResponse: ContainerName:%s | Image:%s", qm.GetContainerName(), qm.Container.Config.Image))
+		}
+	case <- timeout:
+		p.Log("debug", fmt.Sprintf("Experience timeout for IP %s... continue w/o Container info", qm.KV["host"]))
 	}
 	p.QChan.Data.Send(qm)
 }
 
 func (p *Plugin) Run() {
+	p.Log("notice", fmt.Sprintf("Start collector v%s", p.Version))
 	host := p.CfgStringOr("bind-host", "0.0.0.0")
 	port := p.CfgStringOr("bind-port", "11001")
 	// Listen for incoming connections.
@@ -119,7 +126,7 @@ func (p *Plugin) handleRequest(conn net.Conn) {
 			Msg: string(buf[:n-1]),
 			Host: addrTuple[0],
 		}
-		p.Log("debug", fmt.Sprintf("Received Raw TCP message '%s' from '%s'", im.Msg, im.Host))
+		p.Log("trace", fmt.Sprintf("Received Raw TCP message '%s' from '%s'", im.Msg, im.Host))
 		p.buffer <- im
 	}
 	// Close the connection when you're done with it.
