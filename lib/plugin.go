@@ -18,7 +18,6 @@ const (
 	version = "0.2.3"
 	pluginTyp = "collector"
 	pluginPkg = "tcp"
-	dockerAPI = "v1.29"
 )
 
 type Plugin struct {
@@ -57,7 +56,7 @@ func (p *Plugin) HandleInventoryRequest(qm qtypes.Message) {
 			p.Log("trace", fmt.Sprintf("Got InventoryResponse: ContainerName:%s | Image:%s", qm.GetContainerName(), qm.Container.Config.Image))
 		}
 	case <- timeout:
-		p.Log("debug", fmt.Sprintf("Experience timeout for IP %s... continue w/o Container info", qm.KV["host"]))
+		p.Log("debug", fmt.Sprintf("Experience timeout for IP %s... continue w/o Container info (SourcePath: %s)", qm.KV["host"], strings.Join(qm.SourcePath, ",")))
 	}
 	p.QChan.Data.Send(qm)
 }
