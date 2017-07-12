@@ -1,6 +1,8 @@
 # qframe-collector-tcp
 TCP collector for the qframe framework.
 
+**Depreciated!** Moved to [qframe/collector-tcp](https://github.com/qframe/collector-tcp)
+
 ## main.go
 
 The example script will instantiate the collector and wait for a message send to it.
